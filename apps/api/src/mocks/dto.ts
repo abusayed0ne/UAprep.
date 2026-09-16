@@ -1,0 +1,5 @@
+import {z} from 'zod';
+const id=z.string().min(1);
+export const createBlueprintSchema=z.object({patternVersionId:id,name:z.string().trim().min(2).max(160),description:z.string().max(2000).optional(),sections:z.array(z.object({name:z.string().min(1).max(120),position:z.number().int().positive(),subjectId:id.optional(),requiredCount:z.number().int().positive(),totalMarks:z.number().positive(),durationSeconds:z.number().int().positive(),topicCoverage:z.record(z.string(),z.number().int().nonnegative()),difficultyDistribution:z.record(z.string(),z.number().int().nonnegative()),allowedQuestionTypes:z.array(z.string().min(1)).min(1),exposureLimit:z.number().int().positive(),randomizationPolicy:z.json(),explanationsRequired:z.boolean().default(true)})).min(1)});
+export const createMockSchema=z.object({blueprintId:id,name:z.string().trim().min(2).max(160),scoringPolicyVersionId:id,sections:z.array(z.object({position:z.number().int().positive(),questionVersionIds:z.array(id)})).min(1)});
+export const createMockVersionSchema=createMockSchema.pick({scoringPolicyVersionId:true,sections:true});

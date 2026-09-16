@@ -1,0 +1,1 @@
+export default function Signup() { return <main className="shell"><section className="hero"><div className="card"><h1>Create account</h1><p>Registration is intentionally closed until verified-email, session rotation, abuse protection, and privacy notice acceptance are connected.</p><a href="/">Back home</a></div></section></main>; }

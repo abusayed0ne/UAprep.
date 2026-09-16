@@ -1,0 +1,986 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum EvidenceStatus {
+  DRAFT
+  APPROVED
+  STALE
+  SUPERSEDED
+}
+
+enum EvidenceConfidence {
+  VERIFIED
+  PROBABLE
+  UNVERIFIED
+}
+
+enum EvidenceTier {
+  A_OFFICIAL_CURRENT
+  B_OFFICIAL_SUPPORTING
+  C_VERIFIED_COMMUNICATION
+  D_RESEARCH_LEAD
+}
+
+enum EvidenceClaimStatus {
+  DRAFT
+  APPROVED
+  STALE
+  SUPERSEDED
+}
+
+enum PatternStatus {
+  DRAFT
+  UNDER_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  PUBLISHED
+  STALE
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum QuestionStatus {
+  RESEARCH_BRIEF
+  DRAFT
+  SUBMITTED
+  AUTO_CHECK_FAILED
+  IN_REVIEW
+  REVISION_REQUIRED
+  ANSWER_VALIDATION
+  FAIRNESS_REVIEW
+  RIGHTS_REVIEW
+  APPROVAL_PENDING
+  APPROVED_FOR_PILOT
+  PILOTING
+  APPROVED_PRODUCTION
+  QUARANTINED
+  RETIRED
+  ARCHIVED
+}
+
+enum RightsStatus {
+  UNKNOWN
+  INTERNAL_ORIGINAL
+  LICENSED
+  OPEN_LICENSE_VERIFIED
+  PUBLIC_DOMAIN_VERIFIED
+  REFERENCE_ONLY
+  REJECTED
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
+  CANCELLED
+}
+
+enum ValidationDecision {
+  MATCH
+  DISAGREEMENT
+  INVESTIGATION_REQUIRED
+}
+
+enum ReviewDecision {
+  APPROVED
+  REVISION_REQUIRED
+  REJECTED
+  ESCALATED
+}
+
+enum ApprovalDecision {
+  APPROVED_FOR_PILOT
+  APPROVED_PRODUCTION
+  REJECTED
+  REVISION_REQUIRED
+}
+
+enum MockVersionStatus {
+  DRAFT
+  VALIDATING
+  READY
+  PUBLISHED
+  RETIRED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  INITIATED
+  VALIDATED
+  FAILED
+  REFUNDED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum AttemptStatus {
+  CREATED
+  IN_PROGRESS
+  SUBMISSION_PENDING
+  SUBMITTED
+  SCORING
+  AWAITING_MANUAL_MARKING
+  SCORED
+  RELEASED
+  RESCORE_PENDING
+  EXPIRED
+}
+
+model Tenant {
+  id                  String               @id @default(cuid())
+  slug                String               @unique
+  name                String
+  createdAt           DateTime             @default(now())
+  memberships         TenantMembership[]
+  universities        University[]
+  questions           Question[]
+  mocks               Mock[]
+  attempts            Attempt[]
+  auditEvents         AuditEvent[]
+  subjects            Subject[]
+  contentSources      ContentSource[]
+  questionAssignments QuestionAssignment[]
+  mockBlueprints      MockBlueprint[]
+  studentTargets      StudentTarget[]
+  products            Product[]
+  orders              Order[]
+}
+
+model User {
+  id             String             @id @default(cuid())
+  email          String             @unique
+  status         UserStatus         @default(ACTIVE)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  memberships    TenantMembership[]
+  sessions       Session[]
+  roleBindings   RoleBinding[]
+  attempts       Attempt[]
+  studentTargets StudentTarget[]
+  orders         Order[]
+  entitlements   Entitlement[]
+}
+
+model Product {
+  id           String        @id @default(cuid())
+  tenantId     String
+  code         String
+  name         String
+  active       Boolean       @default(true)
+  metadata     Json?
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  prices       Price[]
+  orders       Order[]
+  entitlements Entitlement[]
+
+  @@unique([tenantId, code])
+}
+
+model Price {
+  id        String  @id @default(cuid())
+  productId String
+  amount    Decimal @db.Decimal(12, 2)
+  currency  String
+  active    Boolean @default(true)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  orders    Order[]
+}
+
+model Order {
+  id           String        @id @default(cuid())
+  tenantId     String
+  userId       String
+  productId    String
+  priceId      String
+  amount       Decimal       @db.Decimal(12, 2)
+  currency     String
+  status       OrderStatus   @default(PENDING)
+  createdAt    DateTime      @default(now())
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  product      Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  price        Price         @relation(fields: [priceId], references: [id], onDelete: Restrict)
+  payments     Payment[]
+  entitlements Entitlement[]
+
+  @@index([tenantId, userId, createdAt])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String
+  provider        String
+  providerTxnId   String
+  amount          Decimal       @db.Decimal(12, 2)
+  currency        String
+  status          PaymentStatus @default(INITIATED)
+  validatedAt     DateTime?
+  providerPayload Json?
+  createdAt       DateTime      @default(now())
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, providerTxnId])
+}
+
+model Entitlement {
+  id        String    @id @default(cuid())
+  userId    String
+  productId String
+  orderId   String
+  startsAt  DateTime  @default(now())
+  endsAt    DateTime?
+  revokedAt DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, productId, orderId])
+}
+
+model Subscription {
+  id        String             @id @default(cuid())
+  userId    String
+  productId String
+  status    SubscriptionStatus @default(ACTIVE)
+  startsAt  DateTime           @default(now())
+  endsAt    DateTime?
+  createdAt DateTime           @default(now())
+
+  @@index([userId, status])
+}
+
+model StudentTarget {
+  id           String    @id @default(cuid())
+  tenantId     String
+  studentId    String
+  universityId String
+  programId    String?
+  intake       String?
+  examDate     DateTime?
+  createdAt    DateTime  @default(now())
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student      User      @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, universityId, programId, intake])
+  @@index([tenantId, studentId])
+}
+
+model TenantMembership {
+  tenantId  String
+  userId    String
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([tenantId, userId])
+}
+
+model Session {
+  id          String    @id @default(cuid())
+  userId      String
+  tokenHash   String    @unique
+  mfaVerified Boolean   @default(false)
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model RoleBinding {
+  id        String   @id @default(cuid())
+  userId    String
+  tenantId  String
+  role      String
+  scope     Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId, role])
+  @@index([tenantId, role])
+}
+
+model University {
+  id       String             @id @default(cuid())
+  tenantId String
+  name     String
+  slug     String
+  isDemo   Boolean            @default(true)
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  programs Program[]
+  evidence EvidenceSource[]
+  patterns AdmissionPattern[]
+
+  @@unique([tenantId, slug])
+}
+
+model Program {
+  id                   String           @id @default(cuid())
+  universityId         String
+  name                 String
+  code                 String?
+  university           University       @relation(fields: [universityId], references: [id], onDelete: Restrict)
+  patternApplicability PatternProgram[]
+  evidenceClaims       EvidenceClaim[]
+
+  @@unique([universityId, name])
+}
+
+model EvidenceSource {
+  id              String             @id @default(cuid())
+  universityId    String
+  claimType       String
+  tier            EvidenceTier
+  sourceType      String
+  sourceReference String
+  snapshotHash    String?
+  observedAt      DateTime
+  effectiveAt     DateTime?
+  confidence      EvidenceConfidence @default(UNVERIFIED)
+  status          EvidenceStatus     @default(DRAFT)
+  researcherId    String
+  verifierId      String?
+  nextReviewAt    DateTime?
+  notes           String?
+  university      University         @relation(fields: [universityId], references: [id], onDelete: Restrict)
+  claims          EvidenceClaim[]
+  patternLinks    PatternEvidence[]
+
+  @@index([universityId, status])
+}
+
+model EvidenceClaim {
+  id               String              @id @default(cuid())
+  evidenceSourceId String
+  programId        String?
+  intake           String?
+  claimType        String
+  statement        String
+  status           EvidenceClaimStatus @default(DRAFT)
+  effectiveFrom    DateTime?
+  effectiveUntil   DateTime?
+  approvedById     String?
+  approvedAt       DateTime?
+  evidenceSource   EvidenceSource      @relation(fields: [evidenceSourceId], references: [id], onDelete: Restrict)
+  program          Program?            @relation(fields: [programId], references: [id], onDelete: Restrict)
+
+  @@index([evidenceSourceId, status])
+  @@index([programId, intake])
+}
+
+model AdmissionPattern {
+  id           String                    @id @default(cuid())
+  universityId String
+  name         String
+  university   University                @relation(fields: [universityId], references: [id], onDelete: Restrict)
+  versions     AdmissionPatternVersion[]
+
+  @@unique([universityId, name])
+}
+
+model AdmissionPatternVersion {
+  id                   String            @id @default(cuid())
+  patternId            String
+  version              Int
+  status               PatternStatus     @default(DRAFT)
+  intake               String?
+  effectiveFrom        DateTime?
+  effectiveUntil       DateTime?
+  publishedAt          DateTime?
+  pattern              AdmissionPattern  @relation(fields: [patternId], references: [id], onDelete: Restrict)
+  sections             PatternSection[]
+  evidenceLinks        PatternEvidence[]
+  programApplicability PatternProgram[]
+  mockBlueprints       MockBlueprint[]
+  mockVersions         MockVersion[]
+
+  @@unique([patternId, version])
+}
+
+model PatternEvidence {
+  patternVersionId String
+  evidenceSourceId String
+  patternVersion   AdmissionPatternVersion @relation(fields: [patternVersionId], references: [id], onDelete: Restrict)
+  evidenceSource   EvidenceSource          @relation(fields: [evidenceSourceId], references: [id], onDelete: Restrict)
+
+  @@id([patternVersionId, evidenceSourceId])
+}
+
+model PatternProgram {
+  patternVersionId String
+  programId        String
+  patternVersion   AdmissionPatternVersion @relation(fields: [patternVersionId], references: [id], onDelete: Restrict)
+  program          Program                 @relation(fields: [programId], references: [id], onDelete: Restrict)
+
+  @@id([patternVersionId, programId])
+  @@index([programId])
+}
+
+model PatternSection {
+  id               String                  @id @default(cuid())
+  patternVersionId String
+  name             String
+  position         Int
+  questionType     String
+  questionCount    Int
+  marks            Decimal                 @db.Decimal(10, 3)
+  durationSeconds  Int
+  wrongPenalty     Decimal                 @default(0) @db.Decimal(10, 3)
+  calculatorPolicy String?
+  passRule         Json?
+  subjectId        String?
+  patternVersion   AdmissionPatternVersion @relation(fields: [patternVersionId], references: [id], onDelete: Restrict)
+  subject          Subject?                @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@unique([patternVersionId, position])
+}
+
+model Subject {
+  id              String           @id @default(cuid())
+  tenantId        String
+  name            String
+  slug            String
+  description     String?
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  topics          Topic[]
+  patternSections PatternSection[]
+
+  @@unique([tenantId, slug])
+}
+
+model Topic {
+  id         String              @id @default(cuid())
+  subjectId  String
+  name       String
+  slug       String
+  subject    Subject             @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  objectives LearningObjective[]
+  subtopics  Subtopic[]
+
+  @@unique([subjectId, slug])
+}
+
+model Subtopic {
+  id          String              @id @default(cuid())
+  topicId     String
+  name        String
+  slug        String
+  description String?
+  topic       Topic               @relation(fields: [topicId], references: [id], onDelete: Restrict)
+  objectives  LearningObjective[]
+
+  @@unique([topicId, slug])
+}
+
+model LearningObjective {
+  id               String            @id @default(cuid())
+  topicId          String
+  subtopicId       String?
+  code             String?
+  statement        String
+  topic            Topic             @relation(fields: [topicId], references: [id], onDelete: Restrict)
+  subtopic         Subtopic?         @relation(fields: [subtopicId], references: [id], onDelete: Restrict)
+  questionVersions QuestionVersion[]
+}
+
+model Question {
+  id                String                  @id @default(cuid())
+  tenantId          String
+  canonicalCode     String
+  status            QuestionStatus          @default(RESEARCH_BRIEF)
+  setterId          String
+  currentVersionId  String?
+  createdAt         DateTime                @default(now())
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  versions          QuestionVersion[]
+  reviews           QuestionReview[]
+  rightsReviews     RightsReview[]
+  assignments       QuestionAssignment[]
+  answerValidations AnswerValidation[]
+  approvals         QuestionApproval[]
+  workflowEvents    QuestionWorkflowEvent[]
+  lintResults       QuestionLintResult[]
+  reports           QuestionReport[]
+  statistics        ItemStatistic[]
+
+  @@unique([tenantId, canonicalCode])
+  @@index([tenantId, status])
+}
+
+model QuestionVersion {
+  id                 String            @id @default(cuid())
+  questionId         String
+  version            Int
+  objectiveId        String
+  questionType       String
+  language           String
+  stem               String
+  solution           String
+  studentExplanation String
+  commonMistake      String?
+  shortcut           String?
+  intendedDifficulty String
+  targetTimeSeconds  Int
+  marks              Decimal           @db.Decimal(10, 3)
+  wrongPenalty       Decimal           @default(0) @db.Decimal(10, 3)
+  sourceType         String
+  provenance         Json
+  contentSourceId    String?
+  rightsStatus       RightsStatus      @default(UNKNOWN)
+  officialQuestion   Boolean           @default(false)
+  normalizedHash     String
+  createdAt          DateTime          @default(now())
+  question           Question          @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  objective          LearningObjective @relation(fields: [objectiveId], references: [id], onDelete: Restrict)
+  contentSource      ContentSource?    @relation(fields: [contentSourceId], references: [id], onDelete: Restrict)
+  options            QuestionOption[]
+  mockItems          MockItem[]
+
+  @@unique([questionId, version])
+  @@index([normalizedHash])
+}
+
+model ContentSource {
+  id               String            @id @default(cuid())
+  tenantId         String
+  name             String
+  sourceType       String
+  rightsStatus     RightsStatus      @default(UNKNOWN)
+  copyrightOwner   String?
+  licenseReference String?
+  licenseExpiresAt DateTime?
+  metadata         Json?
+  createdAt        DateTime          @default(now())
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  questionVersions QuestionVersion[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, rightsStatus])
+}
+
+model QuestionAssignment {
+  id                  String           @id @default(cuid())
+  tenantId            String
+  setterId            String
+  questionId          String?
+  universityPatternId String?
+  subjectId           String
+  topicId             String?
+  learningObjectiveId String?
+  numberRequired      Int
+  difficultyMix       Json
+  questionType        String
+  targetTimeSeconds   Int?
+  deadlineAt          DateTime?
+  instructions        String?
+  status              AssignmentStatus @default(ASSIGNED)
+  createdById         String
+  createdAt           DateTime         @default(now())
+  tenant              Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  question            Question?        @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, setterId, status])
+}
+
+model QuestionOption {
+  id                String          @id @default(cuid())
+  questionVersionId String
+  position          Int
+  content           String
+  isCorrect         Boolean
+  questionVersion   QuestionVersion @relation(fields: [questionVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([questionVersionId, position])
+}
+
+model QuestionReview {
+  id                String         @id @default(cuid())
+  questionId        String
+  reviewerId        String
+  reviewType        String
+  decision          ReviewDecision
+  questionVersionId String
+  comments          String?
+  createdAt         DateTime       @default(now())
+  question          Question       @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@index([questionId, reviewType])
+}
+
+model AnswerValidation {
+  id                  String             @id @default(cuid())
+  questionId          String
+  questionVersionId   String
+  validatorId         String
+  independentAnswer   Json
+  reasoning           String
+  decision            ValidationDecision
+  setterKeyRevealedAt DateTime?
+  createdAt           DateTime           @default(now())
+  question            Question           @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@index([questionId, createdAt])
+}
+
+model QuestionApproval {
+  id                String           @id @default(cuid())
+  questionId        String
+  questionVersionId String
+  approverId        String
+  decision          ApprovalDecision
+  checklist         Json
+  reason            String?
+  createdAt         DateTime         @default(now())
+  question          Question         @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@index([questionId, createdAt])
+}
+
+model QuestionLintResult {
+  id                String   @id @default(cuid())
+  questionId        String
+  questionVersionId String
+  code              String
+  severity          String
+  field             String?
+  message           String
+  createdAt         DateTime @default(now())
+  question          Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@index([questionId, questionVersionId])
+}
+
+model QuestionWorkflowEvent {
+  id         String         @id @default(cuid())
+  questionId String
+  actorId    String
+  fromStatus QuestionStatus
+  toStatus   QuestionStatus
+  reason     String?
+  createdAt  DateTime       @default(now())
+  question   Question       @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@index([questionId, createdAt])
+}
+
+model RightsReview {
+  id                String       @id @default(cuid())
+  questionId        String
+  reviewerId        String
+  status            RightsStatus
+  questionVersionId String
+  evidence          Json
+  createdAt         DateTime     @default(now())
+  question          Question     @relation(fields: [questionId], references: [id], onDelete: Restrict)
+}
+
+model Mock {
+  id          String        @id @default(cuid())
+  tenantId    String
+  name        String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  versions    MockVersion[]
+  blueprintId String
+  blueprint   MockBlueprint @relation(fields: [blueprintId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, name])
+}
+
+model MockBlueprint {
+  id               String                  @id @default(cuid())
+  tenantId         String
+  patternVersionId String
+  name             String
+  description      String?
+  active           Boolean                 @default(true)
+  createdById      String
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  tenant           Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  patternVersion   AdmissionPatternVersion @relation(fields: [patternVersionId], references: [id], onDelete: Restrict)
+  sections         MockBlueprintSection[]
+  mocks            Mock[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, active])
+}
+
+model MockBlueprintSection {
+  id                     String        @id @default(cuid())
+  blueprintId            String
+  name                   String
+  position               Int
+  subjectId              String?
+  requiredCount          Int
+  totalMarks             Decimal       @db.Decimal(10, 3)
+  durationSeconds        Int
+  topicCoverage          Json
+  difficultyDistribution Json
+  allowedQuestionTypes   String[]
+  exposureLimit          Int
+  randomizationPolicy    Json
+  explanationsRequired   Boolean       @default(true)
+  blueprint              MockBlueprint @relation(fields: [blueprintId], references: [id], onDelete: Restrict)
+
+  @@unique([blueprintId, position])
+}
+
+model MockVersion {
+  id                     String                  @id @default(cuid())
+  mockId                 String
+  version                Int
+  patternVersionId       String
+  scoringPolicyVersionId String
+  blueprintId            String
+  status                 MockVersionStatus       @default(DRAFT)
+  validationHash         String?
+  publishedAt            DateTime?
+  mock                   Mock                    @relation(fields: [mockId], references: [id], onDelete: Restrict)
+  patternVersion         AdmissionPatternVersion @relation(fields: [patternVersionId], references: [id], onDelete: Restrict)
+  scoringPolicy          ScoringPolicyVersion    @relation(fields: [scoringPolicyVersionId], references: [id], onDelete: Restrict)
+  sections               MockSection[]
+  attempts               Attempt[]
+  validationReports      MockValidationReport[]
+
+  @@unique([mockId, version])
+}
+
+model MockSection {
+  id              String      @id @default(cuid())
+  mockVersionId   String
+  name            String
+  position        Int
+  durationSeconds Int
+  totalMarks      Decimal     @db.Decimal(10, 3)
+  mockVersion     MockVersion @relation(fields: [mockVersionId], references: [id], onDelete: Restrict)
+  items           MockItem[]
+
+  @@unique([mockVersionId, position])
+}
+
+model MockItem {
+  id                String          @id @default(cuid())
+  mockSectionId     String
+  questionVersionId String
+  position          Int
+  mockSection       MockSection     @relation(fields: [mockSectionId], references: [id], onDelete: Restrict)
+  questionVersion   QuestionVersion @relation(fields: [questionVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([mockSectionId, position])
+}
+
+model MockValidationReport {
+  id            String      @id @default(cuid())
+  mockVersionId String
+  isValid       Boolean
+  issues        Json
+  inputHash     String
+  validatedById String
+  createdAt     DateTime    @default(now())
+  mockVersion   MockVersion @relation(fields: [mockVersionId], references: [id], onDelete: Restrict)
+
+  @@index([mockVersionId, createdAt])
+}
+
+model ScoringPolicyVersion {
+  id           String        @id @default(cuid())
+  tenantId     String
+  policyKey    String
+  version      Int
+  rules        Json
+  publishedAt  DateTime?
+  mockVersions MockVersion[]
+  attempts     Attempt[]
+
+  @@unique([tenantId, policyKey, version])
+}
+
+model Attempt {
+  id                     String               @id @default(cuid())
+  tenantId               String
+  studentId              String
+  mockVersionId          String
+  scoringPolicyVersionId String
+  startKey               String
+  status                 AttemptStatus        @default(CREATED)
+  startedAt              DateTime?
+  deadlineAt             DateTime?
+  submittedAt            DateTime?
+  tenant                 Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student                User                 @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  mockVersion            MockVersion          @relation(fields: [mockVersionId], references: [id], onDelete: Restrict)
+  scoringPolicy          ScoringPolicyVersion @relation(fields: [scoringPolicyVersionId], references: [id], onDelete: Restrict)
+  snapshot               AttemptSnapshot?
+  answers                AttemptAnswer[]
+  score                  AttemptScore?
+  events                 AttemptEvent[]
+
+  @@unique([studentId, startKey])
+  @@index([tenantId, studentId])
+}
+
+model AttemptSnapshot {
+  id                     String   @id @default(cuid())
+  attemptId              String   @unique
+  patternVersionId       String
+  scoringPolicyVersionId String
+  questionOrder          Json
+  optionOrder            Json
+  reviewPolicy           Json
+  createdAt              DateTime @default(now())
+  attempt                Attempt  @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+}
+
+model AttemptAnswer {
+  id                String   @id @default(cuid())
+  attemptId         String
+  questionVersionId String
+  operationId       String
+  revision          Int
+  response          Json
+  savedAt           DateTime @default(now())
+  attempt           Attempt  @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+
+  @@unique([attemptId, operationId])
+  @@unique([attemptId, questionVersionId, revision])
+}
+
+model AttemptEvent {
+  id        String   @id @default(cuid())
+  attemptId String
+  eventType String
+  payload   Json?
+  createdAt DateTime @default(now())
+  attempt   Attempt  @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+
+  @@index([attemptId, createdAt])
+}
+
+model AttemptScore {
+  id            String          @id @default(cuid())
+  attemptId     String          @unique
+  total         Decimal         @db.Decimal(12, 3)
+  details       Json
+  createdAt     DateTime        @default(now())
+  attempt       Attempt         @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+  revisions     ScoreRevision[]
+  sectionScores SectionScore[]
+}
+
+model SectionScore {
+  id        String       @id @default(cuid())
+  scoreId   String
+  sectionId String
+  total     Decimal      @db.Decimal(12, 3)
+  details   Json
+  score     AttemptScore @relation(fields: [scoreId], references: [id], onDelete: Restrict)
+
+  @@unique([scoreId, sectionId])
+}
+
+model ScoreRevision {
+  id            String       @id @default(cuid())
+  scoreId       String
+  previousTotal Decimal      @db.Decimal(12, 3)
+  revisedTotal  Decimal      @db.Decimal(12, 3)
+  reason        String
+  approverId    String
+  createdAt     DateTime     @default(now())
+  score         AttemptScore @relation(fields: [scoreId], references: [id], onDelete: Restrict)
+}
+
+model ScoreEvent {
+  id        String   @id @default(cuid())
+  scoreId   String
+  eventType String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([scoreId, createdAt])
+}
+
+model QuestionReport {
+  id                String   @id @default(cuid())
+  questionId        String
+  questionVersionId String
+  attemptId         String
+  studentId         String
+  category          String
+  details           String?
+  status            String   @default("OPEN")
+  createdAt         DateTime @default(now())
+  question          Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@index([questionId, status])
+  @@index([studentId, createdAt])
+}
+
+model ItemStatistic {
+  id                 String   @id @default(cuid())
+  questionId         String
+  questionVersionId  String
+  sampleSize         Int
+  correctCount       Int
+  incorrectCount     Int
+  skipCount          Int
+  facility           Decimal? @db.Decimal(8, 5)
+  discrimination     Decimal? @db.Decimal(8, 5)
+  medianResponseTime Int?
+  optionDistribution Json
+  analysisStatus     String
+  calculatedAt       DateTime @default(now())
+  question           Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@unique([questionVersionId])
+}
+
+model AuditEvent {
+  id            String   @id @default(cuid())
+  tenantId      String
+  actorId       String?
+  eventType     String
+  resourceType  String
+  resourceId    String
+  correlationId String
+  summary       Json?
+  reason        String?
+  createdAt     DateTime @default(now())
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, createdAt])
+  @@index([resourceType, resourceId])
+}
+
+model FeatureFlag {
+  id            String  @id @default(cuid())
+  tenantId      String
+  key           String
+  enabled       Boolean @default(false)
+  configuration Json?
+
+  @@unique([tenantId, key])
+}

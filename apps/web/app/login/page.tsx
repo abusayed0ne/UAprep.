@@ -1,0 +1,1 @@
+export default function Login() { return <main className="shell"><section className="hero"><div className="card"><h1>Sign in</h1><p>Authentication UI will be connected after the Stage A identity provider decision. No insecure placeholder login is exposed.</p><a href="/">Back home</a></div></section></main>; }
