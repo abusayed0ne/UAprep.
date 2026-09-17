@@ -173,6 +173,8 @@ model Tenant {
 model User {
   id             String             @id @default(cuid())
   email          String             @unique
+  authProvider   String?
+  authSubject    String?
   status         UserStatus         @default(ACTIVE)
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
@@ -183,6 +185,8 @@ model User {
   studentTargets StudentTarget[]
   orders         Order[]
   entitlements   Entitlement[]
+
+  @@unique([authProvider, authSubject])
 }
 
 model Product {

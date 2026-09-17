@@ -6,7 +6,7 @@ Per delivery decision, environment and external-service setup is deferred until 
 
 - Create production/staging PostgreSQL instances and apply the consolidated initial migration.
 - Configure Redis and object storage.
-- Select and wire the production identity provider/session middleware so it establishes verified `RequestContext`.
+- Configure production Supabase URLs/keys and verify the implemented JWKS-backed API identity middleware in staging.
 - Configure staff MFA and break-glass super-admin operations.
 - Create secrets in a managed secret store and replace `.env.example` values.
 - Configure CDN/WAF, DNS, TLS, CSP reporting, rate limits, email/SMS, error monitoring, metrics, and centralized logs.
