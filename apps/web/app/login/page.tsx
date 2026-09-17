@@ -1,53 +1,28 @@
-"use client";
-
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
-import { createClient } from "../../lib/supabase/client";
 
-export default function Login() {
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+const messages: Record<string, string> = {
+  invalid_credentials: "Email or password is incorrect.",
+  unavailable: "Authentication service is temporarily unavailable.",
+};
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPending(true);
-    setError(null);
-    const form = new FormData(event.currentTarget);
-    try {
-      const { error: signInError } =
-        await createClient().auth.signInWithPassword({
-          email: String(form.get("email")),
-          password: String(form.get("password")),
-        });
-      if (signInError) {
-        setError(signInError.message);
-        setPending(false);
-        return;
-      }
-      const requestedPath = new URLSearchParams(window.location.search).get(
-        "next",
-      );
-      const destination =
-        requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
-          ? requestedPath
-          : "/dashboard";
-      window.location.assign(destination);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Authentication request failed",
-      );
-      setPending(false);
-    }
-  }
-
+export default async function Login({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string; error?: string }>;
+}) {
+  const query = await searchParams;
+  const next =
+    query.next?.startsWith("/") && !query.next.startsWith("//")
+      ? query.next
+      : "/dashboard";
+  const error = query.error ? messages[query.error] : undefined;
   return (
     <main className="auth-shell">
       <section className="card auth-card">
         <p className="eyebrow">Welcome back</p>
         <h1>Sign in</h1>
-        <form className="auth-form" method="post" onSubmit={submit}>
+        <form className="auth-form" method="post" action="/auth/login">
+          <input type="hidden" name="next" value={next} />
           <label>
             Email
             <input name="email" type="email" autoComplete="email" required />
@@ -67,8 +42,8 @@ export default function Login() {
               {error}
             </p>
           )}
-          <button className="button" type="submit" disabled={pending}>
-            {pending ? "Signing in..." : "Sign in"}
+          <button className="button" type="submit">
+            Sign in
           </button>
         </form>
         <p className="auth-links">
