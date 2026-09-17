@@ -30,7 +30,7 @@ export default function Login() {
 
   return <main className="auth-shell"><section className="card auth-card">
     <p className="eyebrow">Welcome back</p><h1>Sign in</h1>
-    <form className="auth-form" onSubmit={submit}>
+    <form className="auth-form" method="post" onSubmit={submit}>
       <label>Email<input name="email" type="email" autoComplete="email" required /></label>
       <label>Password<input name="password" type="password" autoComplete="current-password" minLength={8} required /></label>
       {error && <p className="form-error" role="alert">{error}</p>}

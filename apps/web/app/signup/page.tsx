@@ -32,7 +32,7 @@ export default function Signup() {
 
   return <main className="auth-shell"><section className="card auth-card">
     <p className="eyebrow">Start preparing</p><h1>Create account</h1>
-    <form className="auth-form" onSubmit={submit}>
+    <form className="auth-form" method="post" onSubmit={submit}>
       <label>Email<input name="email" type="email" autoComplete="email" required /></label>
       <label>Password<input name="password" type="password" autoComplete="new-password" minLength={8} required /></label>
       <label className="check"><input name="terms" type="checkbox" required /> I accept the privacy notice and terms.</label>
