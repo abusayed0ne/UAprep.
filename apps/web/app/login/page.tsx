@@ -63,7 +63,7 @@ export default function Login() {
             </p>
           )}
           <button className="button" type="submit" disabled={pending}>
-            {pending ? "Signing in…" : "Sign in"}
+            {pending ? "Signing in..." : "Sign in"}
           </button>
         </form>
         <p className="auth-links">

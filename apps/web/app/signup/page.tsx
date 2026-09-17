@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { createClient } from "../../lib/supabase/client";
 
 export default function Signup() {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setPending(true);
     setError(null);
     setMessage(null);
@@ -25,13 +28,15 @@ export default function Signup() {
       setPending(false);
       return;
     }
-    setMessage(
-      data.session
-        ? "Account created. You are signed in."
-        : "Check your email to confirm your account.",
-    );
+    if (data.session) {
+      formElement.reset();
+      router.replace("/dashboard" as never);
+      router.refresh();
+      return;
+    }
+    setMessage("Check your email to confirm your account.");
     setPending(false);
-    event.currentTarget.reset();
+    formElement.reset();
   }
 
   return (
@@ -69,7 +74,7 @@ export default function Signup() {
             </p>
           )}
           <button className="button" type="submit" disabled={pending}>
-            {pending ? "Creating…" : "Create account"}
+            {pending ? "Creating..." : "Create account"}
           </button>
         </form>
         <p className="auth-links">
