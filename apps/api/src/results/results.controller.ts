@@ -1,2 +1,39 @@
-import{Body,Controller,Get,Param,Post,UseGuards}from'@nestjs/common';import{PermissionGuard,RequirePermission}from'../authorization.js';import{AuthContext,type RequestContext}from'../request-context.js';import{ResultsService}from'./results.service.js';
-@Controller('results')@UseGuards(PermissionGuard)export class ResultsController{constructor(private readonly service:ResultsService){}@Get('performance')@RequirePermission('attempt:read-own')performance(@AuthContext()ctx:RequestContext){return this.service.performance(ctx);}@Get(':id')@RequirePermission('attempt:read-own')summary(@AuthContext()ctx:RequestContext,@Param('id')id:string){return this.service.summary(ctx,id);}@Get(':id/review')@RequirePermission('attempt:read-own')review(@AuthContext()ctx:RequestContext,@Param('id')id:string){return this.service.review(ctx,id);}@Post(':id/reports')@RequirePermission('attempt:read-own')report(@AuthContext()ctx:RequestContext,@Param('id')id:string,@Body()body:unknown){return this.service.report(ctx,id,body);}}
+import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { PermissionGuard, RequirePermission } from "../authorization.js";
+import { AuthContext, type RequestContext } from "../request-context.js";
+import { ResultsService } from "./results.service.js";
+@Controller("results")
+@UseGuards(PermissionGuard)
+export class ResultsController {
+  constructor(private readonly service: ResultsService) {}
+  @Get("performance") @RequirePermission("attempt:read-own") performance(
+    @AuthContext() ctx: RequestContext,
+  ) {
+    return this.service.performance(ctx);
+  }
+  @Get(":id") @RequirePermission("attempt:read-own") summary(
+    @AuthContext() ctx: RequestContext,
+    @Param("id") id: string,
+  ) {
+    return this.service.summary(ctx, id);
+  }
+  @Get(":id/review") @RequirePermission("attempt:read-own") review(
+    @AuthContext() ctx: RequestContext,
+    @Param("id") id: string,
+  ) {
+    return this.service.review(ctx, id);
+  }
+  @Post(":id/release") @RequirePermission("scoring:manage") release(
+    @AuthContext() ctx: RequestContext,
+    @Param("id") id: string,
+  ) {
+    return this.service.release(ctx, id);
+  }
+  @Post(":id/reports") @RequirePermission("attempt:read-own") report(
+    @AuthContext() ctx: RequestContext,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    return this.service.report(ctx, id, body);
+  }
+}

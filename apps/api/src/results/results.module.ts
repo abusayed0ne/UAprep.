@@ -1,1 +1,9 @@
-import{Module}from'@nestjs/common';import{PermissionGuard}from'../authorization.js';import{ResultsController}from'./results.controller.js';import{ResultsService}from'./results.service.js';@Module({controllers:[ResultsController],providers:[ResultsService,PermissionGuard]})export class ResultsModule{}
+import { Module } from "@nestjs/common";
+import { PermissionGuard } from "../authorization.js";
+import { ResultsController } from "./results.controller.js";
+import { ResultsService } from "./results.service.js";
+@Module({
+  controllers: [ResultsController],
+  providers: [ResultsService, PermissionGuard],
+})
+export class ResultsModule {}

@@ -8,14 +8,15 @@ Verified locally on 2026-09-17 after implementation stages A-H.
 - Prisma client generation and schema validation
 - Two database migrations applied; local schema is current
 - PostgreSQL healthy with 57 application tables; Redis responds to `PING`
-- All nine workspace packages typecheck and build
-- 38 assertions pass across domain, permission, API authorization, deadline, answer-leakage, release-policy, scoring, workflow, and payment fail-closed tests
+- All nine workspace packages typecheck and build; the web production build contains 20 routes
+- 39 assertions pass across domain, permission, API authorization, deadline, answer-leakage, controlled release, scoring, workflow, and payment fail-closed tests
 - Dependency audit reports no known vulnerabilities
 - Supabase signup, confirmation, login, logout, JWT verification, local identity mapping, and student provisioning
 - Missing, malformed, forged, and insufficient-role requests fail with `401`/`403`
 - Cross-tenant reads and writes are denied; disposable verification data was removed
 - Active exam payload excludes answer keys, solutions, explanations, provenance, and hashes
 - Answer review is unavailable until an attempt is explicitly `RELEASED`
+- Student dashboard, university catalogue, mock start/resume, timed autosaving exam, result history/review, onboarding, profile, subscription catalogue, legal/pricing drafts, and permission-gated staff operations are implemented
 - API liveness and database-backed readiness return `200`
 - CORS, CSP, security headers, correlation IDs, and framework fingerprint suppression verified
 - Tracked files contain no tested account password, service-role key, or private key

@@ -1,7 +1,164 @@
-import{ForbiddenException,Injectable,NotFoundException}from'@nestjs/common';import{database}from'@uaprep/db';import type{RequestContext}from'../request-context.js';import{questionReportSchema}from'./dto.js';import{isAnswerReviewReleased}from'./review-release.js';
-@Injectable()export class ResultsService{
-async summary(ctx:RequestContext,id:string){const attempt=await this.attempt(ctx,id);if(!attempt.score)throw new NotFoundException('Score is not available');return{attemptId:id,total:Number(attempt.score.total),submittedAt:attempt.submittedAt,sections:attempt.score.sectionScores.map(x=>({sectionId:x.sectionId,total:Number(x.total),details:x.details})),details:attempt.score.details};}
-async review(ctx:RequestContext,id:string){const attempt=await this.attempt(ctx,id);if(!isAnswerReviewReleased(attempt.status))throw new ForbiddenException('Answer review is not released');if(!attempt.score)throw new NotFoundException('Score is not available');const latest=new Map<string,{selectedOptionPositions:number[]}>();for(const answer of attempt.answers.sort((a,b)=>a.revision-b.revision))latest.set(answer.questionVersionId,answer.response as {selectedOptionPositions:number[]});return{attemptId:id,questions:attempt.mockVersion.sections.flatMap(section=>section.items.map(item=>{const q=item.questionVersion;return{questionVersionId:q.id,sectionId:section.id,stem:q.stem,options:q.options.map(o=>({position:o.position,content:o.content,isCorrect:o.isCorrect})),selectedOptionPositions:latest.get(q.id)?.selectedOptionPositions??[],solution:q.solution,explanation:q.studentExplanation};}))};}
-async report(ctx:RequestContext,id:string,input:unknown){const data=questionReportSchema.parse(input);const attempt=await this.attempt(ctx,id);const item=attempt.mockVersion.sections.flatMap(s=>s.items).find(x=>x.questionVersionId===data.questionVersionId);if(!item)throw new ForbiddenException();return database.questionReport.create({data:{questionId:item.questionVersion.questionId,questionVersionId:data.questionVersionId,attemptId:id,studentId:ctx.principal.userId,category:data.category,details:data.details??null}});}
-async performance(ctx:RequestContext){const scores=await database.attemptScore.findMany({where:{attempt:{tenantId:ctx.principal.tenantId,studentId:ctx.principal.userId}},include:{attempt:{select:{submittedAt:true,mockVersion:{select:{mock:{select:{name:true}}}}}}},orderBy:{createdAt:'asc'}});return{attemptCount:scores.length,history:scores.map(x=>({attemptId:x.attemptId,mock:x.attempt.mockVersion.mock.name,total:Number(x.total),submittedAt:x.attempt.submittedAt}))};}
-private async attempt(ctx:RequestContext,id:string){const row=await database.attempt.findFirst({where:{id,tenantId:ctx.principal.tenantId,studentId:ctx.principal.userId,status:{in:['SCORED','RELEASED','RESCORE_PENDING']}},include:{score:{include:{sectionScores:true}},answers:true,mockVersion:{include:{sections:{include:{items:{include:{questionVersion:{include:{options:true}}}}}}}}}});if(!row)throw new ForbiddenException();return row;}}
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { database } from "@uaprep/db";
+import type { RequestContext } from "../request-context.js";
+import { questionReportSchema } from "./dto.js";
+import {
+  canReleaseAnswerReview,
+  isAnswerReviewReleased,
+} from "./review-release.js";
+@Injectable()
+export class ResultsService {
+  async summary(ctx: RequestContext, id: string) {
+    const attempt = await this.attempt(ctx, id);
+    if (!attempt.score) throw new NotFoundException("Score is not available");
+    return {
+      attemptId: id,
+      total: Number(attempt.score.total),
+      submittedAt: attempt.submittedAt,
+      sections: attempt.score.sectionScores.map((x) => ({
+        sectionId: x.sectionId,
+        total: Number(x.total),
+        details: x.details,
+      })),
+      details: attempt.score.details,
+    };
+  }
+  async review(ctx: RequestContext, id: string) {
+    const attempt = await this.attempt(ctx, id);
+    if (!isAnswerReviewReleased(attempt.status))
+      throw new ForbiddenException("Answer review is not released");
+    if (!attempt.score) throw new NotFoundException("Score is not available");
+    const latest = new Map<string, { selectedOptionPositions: number[] }>();
+    for (const answer of attempt.answers.sort(
+      (a, b) => a.revision - b.revision,
+    ))
+      latest.set(
+        answer.questionVersionId,
+        answer.response as { selectedOptionPositions: number[] },
+      );
+    return {
+      attemptId: id,
+      questions: attempt.mockVersion.sections.flatMap((section) =>
+        section.items.map((item) => {
+          const q = item.questionVersion;
+          return {
+            questionVersionId: q.id,
+            sectionId: section.id,
+            stem: q.stem,
+            options: q.options.map((o) => ({
+              position: o.position,
+              content: o.content,
+              isCorrect: o.isCorrect,
+            })),
+            selectedOptionPositions:
+              latest.get(q.id)?.selectedOptionPositions ?? [],
+            solution: q.solution,
+            explanation: q.studentExplanation,
+          };
+        }),
+      ),
+    };
+  }
+  async report(ctx: RequestContext, id: string, input: unknown) {
+    const data = questionReportSchema.parse(input);
+    const attempt = await this.attempt(ctx, id);
+    const item = attempt.mockVersion.sections
+      .flatMap((s) => s.items)
+      .find((x) => x.questionVersionId === data.questionVersionId);
+    if (!item) throw new ForbiddenException();
+    return database.questionReport.create({
+      data: {
+        questionId: item.questionVersion.questionId,
+        questionVersionId: data.questionVersionId,
+        attemptId: id,
+        studentId: ctx.principal.userId,
+        category: data.category,
+        details: data.details ?? null,
+      },
+    });
+  }
+  async performance(ctx: RequestContext) {
+    const scores = await database.attemptScore.findMany({
+      where: {
+        attempt: {
+          tenantId: ctx.principal.tenantId,
+          studentId: ctx.principal.userId,
+        },
+      },
+      include: {
+        attempt: {
+          select: {
+            submittedAt: true,
+            mockVersion: { select: { mock: { select: { name: true } } } },
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    return {
+      attemptCount: scores.length,
+      history: scores.map((x) => ({
+        attemptId: x.attemptId,
+        mock: x.attempt.mockVersion.mock.name,
+        total: Number(x.total),
+        submittedAt: x.attempt.submittedAt,
+      })),
+    };
+  }
+  async release(ctx: RequestContext, id: string) {
+    const attempt = await database.attempt.findFirst({
+      where: { id, tenantId: ctx.principal.tenantId },
+      select: { id: true, status: true, score: { select: { id: true } } },
+    });
+    if (!attempt) throw new ForbiddenException();
+    if (!attempt.score) throw new NotFoundException("Score is not available");
+    if (attempt.status === "RELEASED")
+      return { attemptId: id, status: "RELEASED", idempotent: true };
+    if (!canReleaseAnswerReview(attempt.status))
+      throw new ForbiddenException(
+        "Attempt score cannot be released from its current state",
+      );
+    await database.$transaction([
+      database.attempt.update({ where: { id }, data: { status: "RELEASED" } }),
+      database.attemptEvent.create({
+        data: {
+          attemptId: id,
+          eventType: "SCORE_RELEASED",
+          payload: { releasedBy: ctx.principal.userId },
+        },
+      }),
+    ]);
+    return { attemptId: id, status: "RELEASED", idempotent: false };
+  }
+  private async attempt(ctx: RequestContext, id: string) {
+    const row = await database.attempt.findFirst({
+      where: {
+        id,
+        tenantId: ctx.principal.tenantId,
+        studentId: ctx.principal.userId,
+        status: { in: ["SCORED", "RELEASED", "RESCORE_PENDING"] },
+      },
+      include: {
+        score: { include: { sectionScores: true } },
+        answers: true,
+        mockVersion: {
+          include: {
+            sections: {
+              include: {
+                items: {
+                  include: { questionVersion: { include: { options: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!row) throw new ForbiddenException();
+    return row;
+  }
+}
