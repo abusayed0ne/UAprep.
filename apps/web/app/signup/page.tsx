@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { createClient } from "../../lib/supabase/client";
 
 export default function Signup() {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -18,25 +16,33 @@ export default function Signup() {
     setError(null);
     setMessage(null);
     const form = new FormData(event.currentTarget);
-    const { data, error: signUpError } = await createClient().auth.signUp({
-      email: String(form.get("email")),
-      password: String(form.get("password")),
-      options: { emailRedirectTo: `${window.location.origin}/auth/confirm` },
-    });
-    if (signUpError) {
-      setError(signUpError.message);
+    try {
+      const { data, error: signUpError } = await createClient().auth.signUp({
+        email: String(form.get("email")),
+        password: String(form.get("password")),
+        options: { emailRedirectTo: `${window.location.origin}/auth/confirm` },
+      });
+      if (signUpError) {
+        setError(signUpError.message);
+        setPending(false);
+        return;
+      }
+      if (data.session) {
+        formElement.reset();
+        window.location.assign("/dashboard");
+        return;
+      }
+      setMessage("Check your email to confirm your account.");
       setPending(false);
-      return;
-    }
-    if (data.session) {
       formElement.reset();
-      router.replace("/dashboard" as never);
-      router.refresh();
-      return;
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Account creation request failed",
+      );
+      setPending(false);
     }
-    setMessage("Check your email to confirm your account.");
-    setPending(false);
-    formElement.reset();
   }
 
   return (

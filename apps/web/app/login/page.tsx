@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { createClient } from "../../lib/supabase/client";
 
 export default function Login() {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -15,26 +13,33 @@ export default function Login() {
     setPending(true);
     setError(null);
     const form = new FormData(event.currentTarget);
-    const { error: signInError } = await createClient().auth.signInWithPassword(
-      {
-        email: String(form.get("email")),
-        password: String(form.get("password")),
-      },
-    );
-    if (signInError) {
-      setError(signInError.message);
+    try {
+      const { error: signInError } =
+        await createClient().auth.signInWithPassword({
+          email: String(form.get("email")),
+          password: String(form.get("password")),
+        });
+      if (signInError) {
+        setError(signInError.message);
+        setPending(false);
+        return;
+      }
+      const requestedPath = new URLSearchParams(window.location.search).get(
+        "next",
+      );
+      const destination =
+        requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
+          ? requestedPath
+          : "/dashboard";
+      window.location.assign(destination);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Authentication request failed",
+      );
       setPending(false);
-      return;
     }
-    const requestedPath = new URLSearchParams(window.location.search).get(
-      "next",
-    );
-    const destination =
-      requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
-        ? requestedPath
-        : "/dashboard";
-    router.replace(destination as never);
-    router.refresh();
   }
 
   return (
